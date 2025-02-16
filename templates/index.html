@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recorder</title>
+</head>
+<body>
+    <h1>Record and Send Audio</h1>
+    
+    <label for="filename">Enter Filename (optional): </label>
+    <input type="text" id="filename" placeholder="recording">
+    <br><br>
+    
+    <button id="recordButton">Start Recording</button>
+    <p id="status">Press the button to record.</p>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        document.getElementById("recordButton").addEventListener("click", async function () {
+            if (!isRecording) {
+                // Start Recording
+                let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    let audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+                    let formData = new FormData();
+
+                    // Get the filename from input or use default
+                    let filenameInput = document.getElementById("filename").value.trim();
+                    // let filename = filenameInput ? filenameInput + ".wav" : "recording.wav";
+                    let filename = filenameInput + ".wav";
+
+                    formData.append("audio", audioBlob, filename);
+
+                    document.getElementById("status").innerText = "Uploading...";
+
+                    // Send to backend
+                    fetch("http://127.0.0.1:9999/listen_audio", {
+                        method: "POST",
+                        body: formData
+                    })
+                    .then(response => response.text())
+                    .then(data => {
+                        document.getElementById("status").innerText = "Audio sent!";
+                    })
+                    .catch(error => {
+                        document.getElementById("status").innerText = "Error sending audio!";
+                        console.error(error);
+                    });
+
+                    audioChunks = [];
+                };
+
+                mediaRecorder.start();
+                document.getElementById("recordButton").innerText = "Stop Recording";
+                document.getElementById("status").innerText = "Recording...";
+                isRecording = true;
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                document.getElementById("recordButton").innerText = "Start Recording";
+                isRecording = false;
+            }
+        });
+    </script>
+</body>
+</html>
